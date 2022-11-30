@@ -1,0 +1,30 @@
+[package]
+name = "glyphs2fontir"
+version = "0.0.1"
+edition = "2021"
+license = "MIT/Apache-2.0"
+description = "Converts www.glyphsapp.com files to font ir for compilation."
+repository = "https://github.com/googlefonts/fontmake-rs"
+readme = "README.md"
+categories = ["text-processing", "parsing", "graphics"]
+
+[features]
+
+[dependencies]
+read-fonts = { git = 'https://github.com/googlefonts/fontations' }
+fontir = { version = "0.0.1", path = "../fontir" }
+
+# TODO if we commit to this, make a standalone glyphs reader crate
+glyphstool = { git = 'https://github.com/raphlinus/interp-toy' }
+
+quick-xml = { version = "0.22.0", features = ["serialize"] }
+
+log = "0.4"
+env_logger = "0.9.0"
+
+thiserror = "1.0.37"
+
+[dev-dependencies]
+diff = "0.1.12"
+ansi_term = "0.12.1"
+tempfile = "3.3.0"
