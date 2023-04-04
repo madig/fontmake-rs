@@ -2,27 +2,31 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use font_types::Pen;
 use fontdrasil::{orchestration::Work, types::GlyphName};
 use fontir::{coords::NormalizedLocation, ir};
-use kurbo::{cubics_to_quadratic_splines, Affine, BezPath, CubicBez, PathEl, Rect};
+use kurbo::{cubics_to_quadratic_splines, Affine, BezPath, CubicBez, PathEl, Point, Rect};
 use log::{trace, warn};
 
 use read_fonts::{
     tables::glyf::{self, Anchor, Transform},
     types::{F2Dot14, GlyphId},
 };
-use write_fonts::tables::glyf::{Bbox, Component, ComponentFlags, CompositeGlyph, SimpleGlyph};
+use write_fonts::{
+    pens::write_to_pen,
+    tables::glyf::{Bbox, Component, ComponentFlags, CompositeGlyph, SimpleGlyph},
+};
 
 use crate::{
     error::{Error, GlyphProblem},
-    orchestration::{BeWork, Context, Glyph},
+    orchestration::{BeWork, Context, Glyph, GvarFragment},
 };
 
 struct GlyphWork {
     glyph_name: GlyphName,
 }
 
-pub fn create_glyph_work(glyph_name: GlyphName) -> Box<BeWork> {
+pub fn create_glyf_work(glyph_name: GlyphName) -> Box<BeWork> {
     Box::new(GlyphWork { glyph_name })
 }
 
@@ -123,16 +127,14 @@ impl Work<Context, Error> for GlyphWork {
         // Hopefully in time https://github.com/harfbuzz/boring-expansion-spec means we can drop this
         let glyph = cubics_to_quadratics(glyph);
 
-        // TODO refine (submodel) var model if glyph locations is a subset of var model locations
-
         match glyph {
             CheckedGlyph::Composite { name, components } => {
                 let composite = create_composite(context, &name, default_location, &components)?;
                 context.set_glyph(name, composite.into());
             }
-            CheckedGlyph::Contour { name, contours } => {
+            CheckedGlyph::Contour { name, paths } => {
                 // Draw the default outline of our simple glyph
-                let Some(path) = contours.get(default_location) else {
+                let Some(path) = paths.get(default_location) else {
                     return Err(Error::GlyphError(ir_glyph.name.clone(), GlyphProblem::MissingDefault));
                 };
                 let base_glyph = SimpleGlyph::from_kurbo(path).map_err(|e| Error::KurboError {
@@ -140,7 +142,18 @@ impl Work<Context, Error> for GlyphWork {
                     kurbo_problem: e,
                     context: path.to_svg(),
                 })?;
-                context.set_glyph(name, base_glyph.into());
+                context.set_glyph(name.clone(), base_glyph.into());
+
+                let point_seqs: HashMap<_, _> = paths
+                    .into_iter()
+                    .map(|(loc, bez)| (loc, points(bez)))
+                    .collect();
+
+                let deltas = var_model
+                    .deltas(&point_seqs)
+                    .map_err(|e| Error::GlyphDeltaError(self.glyph_name.clone(), e))?;
+
+                context.set_gvar_fragment(name, GvarFragment { deltas });
             }
         }
 
@@ -148,8 +161,66 @@ impl Work<Context, Error> for GlyphWork {
     }
 }
 
+fn points(path: BezPath) -> Vec<Point> {
+    let mut pen = PointPen::new();
+    write_to_pen(&path, &mut pen);
+    pen.into_inner()
+}
+
+// TODO: if this approach sticks move me to write-fonts
+#[derive(Default)]
+pub struct PointPen {
+    last_move: Option<Point>,
+    points: Vec<Point>,
+}
+
+impl PointPen {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn into_inner(self) -> Vec<Point> {
+        self.points
+    }
+}
+
+fn as_kurbo_point(x: f32, y: f32) -> Point {
+    Point {
+        x: x as f64,
+        y: y as f64,
+    }
+}
+
+impl Pen for PointPen {
+    fn move_to(&mut self, x: f32, y: f32) {
+        self.last_move = Some(as_kurbo_point(x, y));
+        self.points.push(as_kurbo_point(x, y));
+    }
+
+    fn line_to(&mut self, x: f32, y: f32) {
+        self.points.push(as_kurbo_point(x, y));
+    }
+
+    fn quad_to(&mut self, cx0: f32, cy0: f32, x: f32, y: f32) {
+        self.points.push(as_kurbo_point(cx0, cy0));
+        self.points.push(as_kurbo_point(x, y));
+    }
+
+    fn curve_to(&mut self, cx0: f32, cy0: f32, cx1: f32, cy1: f32, x: f32, y: f32) {
+        self.points.push(as_kurbo_point(cx0, cy0));
+        self.points.push(as_kurbo_point(cx1, cy1));
+        self.points.push(as_kurbo_point(x, y));
+    }
+
+    fn close(&mut self) {
+        if let Some(last_move) = self.last_move {
+            self.points.push(last_move);
+        }
+    }
+}
+
 fn cubics_to_quadratics(glyph: CheckedGlyph) -> CheckedGlyph {
-    let CheckedGlyph::Contour { name, contours } = glyph else {
+    let CheckedGlyph::Contour { name, paths: contours } = glyph else {
         return glyph;  // nop for composite
     };
 
@@ -256,7 +327,7 @@ fn cubics_to_quadratics(glyph: CheckedGlyph) -> CheckedGlyph {
 
     CheckedGlyph::Contour {
         name,
-        contours: new_contours,
+        paths: new_contours,
     }
 }
 
@@ -273,7 +344,7 @@ enum CheckedGlyph {
     },
     Contour {
         name: GlyphName,
-        contours: HashMap<NormalizedLocation, BezPath>,
+        paths: HashMap<NormalizedLocation, BezPath>,
     },
 }
 
@@ -356,7 +427,10 @@ impl TryFrom<&ir::Glyph> for CheckedGlyph {
                     (location.clone(), path)
                 })
                 .collect();
-            CheckedGlyph::Contour { name, contours }
+            CheckedGlyph::Contour {
+                name,
+                paths: contours,
+            }
         } else {
             let components = glyph
                 .sources()

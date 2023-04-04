@@ -74,16 +74,20 @@ impl Workload {
             // If anything progresses before we've done this we have a graph bug
             AnyWorkId::Fe(FeWorkIdentifier::FinalizeStaticMetadata) => {
                 for glyph_name in fe_root.get_final_static_metadata().glyph_order.iter() {
-                    let id = AnyWorkId::Be(BeWorkIdentifier::Glyph(glyph_name.clone()));
+                    let id = AnyWorkId::Be(BeWorkIdentifier::GlyfFragment(glyph_name.clone()));
                     if self.jobs_pending.contains_key(&id) {
                         continue;
                     }
 
                     log::debug!("Updating graph for new glyph {glyph_name}");
 
-                    // It would be lovely if our new glyph was in glyf and hmtx
+                    // It would be lovely if our new glyph was in glyf, gvar, and hmtx
                     // loca hides with glyf
-                    for merge_id in [BeWorkIdentifier::Glyf, BeWorkIdentifier::Hmtx] {
+                    for merge_id in [
+                        BeWorkIdentifier::Glyf,
+                        BeWorkIdentifier::Gvar,
+                        BeWorkIdentifier::Hmtx,
+                    ] {
                         self.jobs_pending
                             .get_mut(&AnyWorkId::Be(merge_id))
                             .unwrap()
@@ -93,6 +97,11 @@ impl Workload {
 
                     super::add_glyph_be_job(self, fe_root, glyph_name.clone());
                 }
+            }
+
+            // GlyfFragment carries GvarFragment along for the ride
+            AnyWorkId::Be(BeWorkIdentifier::GlyfFragment(glyph_name)) => {
+                self.mark_success(AnyWorkId::Be(BeWorkIdentifier::GvarFragment(glyph_name)))
             }
 
             // Glyf carries Loca along for the ride
