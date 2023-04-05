@@ -213,8 +213,13 @@ impl Pen for PointPen {
     }
 
     fn close(&mut self) {
-        if let Some(last_move) = self.last_move {
-            self.points.push(last_move);
+        // remove last point in closed path if it's the same as the move point,
+        // same as fontTools' SegmentToPointPen.closePath
+        // https://github.com/fonttools/fonttools/blob/3b9a73f/Lib/fontTools/pens/pointPen.py#L321-L323
+        if let (Some(last_move), Some(last_pt)) = (self.last_move, self.points.last()) {
+            if self.points.len() > 1 && *last_pt == last_move {
+                self.points.pop();
+            }
         }
     }
 }
