@@ -614,3 +614,67 @@ impl Work<Context, Error> for GlyfLocaWork {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use fontir::ir::GlyphPathBuilder;
+    use kurbo::Point;
+
+    use super::points;
+
+    #[test]
+    fn test_roundtrip_points_triangle() {
+        let mut path_builder = GlyphPathBuilder::new("a".into());
+        path_builder.line_to((0.0, 0.0)).unwrap();
+        path_builder.line_to((1.0, 0.0)).unwrap();
+        path_builder.line_to((1.0, 1.0)).unwrap();
+        path_builder.close_path().unwrap();
+
+        let path = path_builder.build();
+        println!("{:?}", path);
+        let path_points = points(path);
+        println!("{:?}", path_points);
+
+        assert_eq!(
+            path_points,
+            vec![
+                Point::new(0.0, 0.0),
+                Point::new(1.0, 0.0),
+                Point::new(1.0, 1.0),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_roundtrip_points_qcurve_ellipse() {
+        let mut path_builder = GlyphPathBuilder::new("a".into());
+        path_builder.qcurve_to((0.0, 3.0)).unwrap();
+        path_builder.offcurve((0.0, 5.0)).unwrap();
+        path_builder.qcurve_to((2.0, 5.0)).unwrap();
+        path_builder.offcurve((4.0, 5.0)).unwrap();
+        path_builder.qcurve_to((4.0, 3.0)).unwrap();
+        path_builder.offcurve((4.0, 1.0)).unwrap();
+        path_builder.qcurve_to((2.0, 1.0)).unwrap();
+        path_builder.offcurve((0.0, 1.0)).unwrap();
+        path_builder.close_path().unwrap();
+
+        let path = path_builder.build();
+        println!("{:?}", path);
+        let path_points = points(path);
+        println!("{:?}", path_points);
+
+        assert_eq!(
+            path_points,
+            vec![
+                Point::new(0.0, 3.0),
+                Point::new(0.0, 5.0),
+                Point::new(2.0, 5.0),
+                Point::new(4.0, 5.0),
+                Point::new(4.0, 3.0),
+                Point::new(4.0, 1.0),
+                Point::new(2.0, 1.0),
+                Point::new(0.0, 1.0),
+            ]
+        );
+    }
+}
