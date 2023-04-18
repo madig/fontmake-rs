@@ -20,5 +20,5 @@ pub enum Error {
     #[error("At least one work item failed")]
     TasksFailed(Vec<(AnyWorkId, String)>),
     #[error("Invalid regex")]
-    BadRegex(#[from] regex::Error),
+    BadRegex(#[from] fancy_regex::Error),
 }

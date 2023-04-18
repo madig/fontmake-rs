@@ -14,8 +14,8 @@ use fontir::{
 use glyphs2fontir::source::GlyphsIrSource;
 use ufo2fontir::source::DesignSpaceIrSource;
 
+use fancy_regex::Regex;
 use indexmap::IndexSet;
-use regex::Regex;
 
 //FIXME: clarify the role of this type.
 /// Tracks changes during incremental compilation and... what, exactly?
@@ -49,7 +49,7 @@ impl ChangeDetector {
 
         if let Some(regex) = &glyph_name_filter {
             current_inputs.glyphs.retain(|glyph_name, _| {
-                let result = regex.is_match(glyph_name.as_str());
+                let result = regex.is_match(glyph_name.as_str()).unwrap();
                 if !result {
                     log::trace!("'{glyph_name}' does not match --glyph_name_filter");
                 }
