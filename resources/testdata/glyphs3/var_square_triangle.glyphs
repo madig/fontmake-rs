@@ -1,0 +1,146 @@
+{
+.appVersion = "3151";
+.formatVersion = 3;
+DisplayStrings = (
+"-"
+);
+axes = (
+{
+name = Weight;
+tag = wght;
+}
+);
+date = "2023-04-28 21:14:33 +0000";
+familyName = "New Font";
+fontMaster = (
+{
+axesValues = (
+400
+);
+id = m01;
+metricValues = (
+{
+over = 16;
+pos = 800;
+},
+{
+over = 16;
+pos = 700;
+},
+{
+over = 16;
+pos = 500;
+},
+{
+over = -16;
+},
+{
+over = -16;
+pos = -200;
+},
+{
+over = -16;
+}
+);
+name = Regular;
+},
+{
+axesValues = (
+700
+);
+iconName = SemiBold;
+id = "25341D63-9F19-4CFF-8CA4-FCB80B18D8F2";
+metricValues = (
+{
+pos = 800;
+},
+{
+pos = 700;
+},
+{
+pos = 500;
+},
+{
+},
+{
+pos = -200;
+},
+{
+}
+);
+name = Bold;
+}
+);
+glyphs = (
+{
+glyphname = space;
+layers = (
+{
+layerId = m01;
+width = 200;
+}
+);
+unicode = 32;
+},
+{
+glyphname = hyphen;
+lastChange = "2023-04-28 21:16:28 +0000";
+layers = (
+{
+layerId = m01;
+shapes = (
+{
+closed = 1;
+nodes = (
+(126,242,l),
+(473,242,l),
+(473,335,l),
+(126,335,l)
+);
+}
+);
+width = 600;
+},
+{
+layerId = "25341D63-9F19-4CFF-8CA4-FCB80B18D8F2";
+shapes = (
+{
+closed = 1;
+nodes = (
+(126,242,l),
+(473,242,l),
+(300,335,l),
+(300,335,l)
+);
+}
+);
+width = 600;
+}
+);
+unicode = 45;
+}
+);
+metrics = (
+{
+type = ascender;
+},
+{
+type = "cap height";
+},
+{
+type = "x-height";
+},
+{
+type = baseline;
+},
+{
+type = descender;
+},
+{
+type = "italic angle";
+}
+);
+unitsPerEm = 1000;
+versionMajor = 1;
+versionMinor = 0;
+}
