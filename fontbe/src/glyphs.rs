@@ -17,6 +17,7 @@ use read_fonts::{
 use write_fonts::{
     tables::glyf::{
         simple_glyphs_from_kurbo, Bbox, Component, ComponentFlags, CompositeGlyph, SimpleGlyph,
+        variations::iup_delta_optimize,
     },
     OtRound,
 };
@@ -175,6 +176,7 @@ fn add_phantom_points(advance: u16, points: &mut Vec<Point>) {
     points.push(Point::new(0.0, 0.0));
 }
 
+/// See <https://github.com/fonttools/fonttools/blob/86291b6ef62ad4bdb48495a4b915a597a9652dcf/Lib/fontTools/ttLib/tables/_g_l_y_f.py#L369>
 fn point_seqs_for_simple_glyph(
     ir_glyph: &ir::Glyph,
     instances: HashMap<NormalizedLocation, SimpleGlyph>,
@@ -196,6 +198,7 @@ fn point_seqs_for_simple_glyph(
         .collect()
 }
 
+/// See <https://github.com/fonttools/fonttools/blob/86291b6ef62ad4bdb48495a4b915a597a9652dcf/Lib/fontTools/ttLib/tables/_g_l_y_f.py#L369>
 fn point_seqs_for_composite_glyph(ir_glyph: &ir::Glyph) -> HashMap<NormalizedLocation, Vec<Point>> {
     ir_glyph
         .sources()
@@ -228,7 +231,7 @@ impl Work<Context, Error> for GlyphWork {
         // Hopefully in time https://github.com/harfbuzz/boring-expansion-spec means we can drop this
         let glyph = cubics_to_quadratics(glyph);
 
-        let (name, point_seqs) = match glyph {
+        let (name, mut point_seqs) = match glyph {
             CheckedGlyph::Composite { name, components } => {
                 let composite = create_composite(context, ir_glyph, default_location, &components)?;
                 context.set_glyph(name.clone(), composite.into());
@@ -262,10 +265,26 @@ impl Work<Context, Error> for GlyphWork {
             }
         };
 
+        let coords = point_seqs.remove(default_location).ok_or_else(|| {
+            Error::GlyphError(ir_glyph.name.clone(), GlyphProblem::MissingDefault)
+        })?;
+
+        // TODO real values
+        let tolerance = 0.1;
+        let contour_ends = Vec::new();
+
         // Contour (aka Simple) and Composite both need gvar
         let deltas = var_model
             .deltas(&point_seqs)
-            .map_err(|e| Error::GlyphDeltaError(self.glyph_name.clone(), e))?;
+            .map_err(|e| Error::GlyphDeltaError(self.glyph_name.clone(), e))?
+            .into_iter()
+            .map(|(region, deltas)| {
+                // Doing IUP optimization here conveniently means it threads per-glyph
+                iup_delta_optimize(&deltas, &coords, tolerance, &contour_ends)
+                    .map(|iup_deltas| (region, iup_deltas))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| Error::IupError(ir_glyph.name.clone(), e))?;
 
         context.set_gvar_fragment(name, GvarFragment { deltas });
 

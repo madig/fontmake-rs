@@ -35,7 +35,7 @@ use write_fonts::{
         variations::Tuple,
     },
     validate::Validate,
-    FontBuilder, FontWrite,
+    FontBuilder, FontWrite, OtRound,
 };
 use write_fonts::{from_obj::FromTableRef, tables::glyf::CompositeGlyph};
 
@@ -156,11 +156,11 @@ impl Glyph {
 
 /// Unusually we store something other than the binary gvar per glyph.
 ///
-///
 /// <https://learn.microsoft.com/en-us/typography/opentype/spec/gvar>
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GvarFragment {
-    pub deltas: Vec<(VariationRegion, Vec<Vec2>)>,
+    /// None entries are safe to omit per IUP
+    pub deltas: Vec<(VariationRegion, Vec<Option<Vec2>>)>,
 }
 
 impl GvarFragment {
@@ -177,8 +177,13 @@ impl GvarFragment {
                     return None;
                 }
 
-                // TODO: nice rounding on deltas
-                let deltas: Vec<_> = deltas.iter().map(|v| (v.x as i16, v.y as i16)).collect();
+                let deltas: Vec<_> = deltas
+                    .iter()
+                    .filter_map(|v| match v {
+                        Some(Vec2 { x, y }) => Some((x.ot_round(), y.ot_round())),
+                        None => None,
+                    })
+                    .collect();
 
                 let tuple_builder: TupleBuilder = region.into();
                 let (min, peak, max) = tuple_builder.build();
