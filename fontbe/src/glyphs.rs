@@ -15,8 +15,10 @@ use read_fonts::{
     types::{F2Dot14, GlyphId},
 };
 use write_fonts::{
-    tables::glyf::{
-        simple_glyphs_from_kurbo, Bbox, Component, ComponentFlags, CompositeGlyph, SimpleGlyph,
+    tables::{
+        glyf::{
+            simple_glyphs_from_kurbo, Bbox, Component, ComponentFlags, CompositeGlyph, SimpleGlyph,
+        },
         variations::iup_delta_optimize,
     },
     OtRound,

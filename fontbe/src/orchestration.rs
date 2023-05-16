@@ -179,10 +179,7 @@ impl GvarFragment {
 
                 let deltas: Vec<_> = deltas
                     .iter()
-                    .filter_map(|v| match v {
-                        Some(Vec2 { x, y }) => Some((x.ot_round(), y.ot_round())),
-                        None => None,
-                    })
+                    .filter_map(|v| v.as_ref().map(|Vec2 { x, y }| (x.ot_round(), y.ot_round())))
                     .collect();
 
                 let tuple_builder: TupleBuilder = region.into();

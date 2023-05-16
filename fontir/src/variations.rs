@@ -164,6 +164,10 @@ impl VariationModel {
             .collect();
 
         let Some(defaults) = point_seqs.get(&self.default) else {
+            eprintln!("{:?}", self.default);
+            for k in point_seqs.keys() {
+                eprintln!("  points for {:?}", k);
+            }
             return Err(DeltaError::DefaultUndefined);
         };
         for loc in point_seqs.keys() {
